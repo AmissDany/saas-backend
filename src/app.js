@@ -23,18 +23,25 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Si no hay origin (requests desde curl o Postman), usar siempre tu frontend de Render
+    // Si no hay origin (curl, Postman), usar siempre tu frontend en Render
     if (!origin) return callback(null, 'https://saas-frontend-onpj.onrender.com');
 
-    // Si el origin está en la lista, permitirlo
-    if (allowedOrigins.includes(origin)) {
-      callback(null, origin);
-    } else {
-      callback(new Error('CORS no permitido: ' + origin));
+    // Si el origin es exactamente tu frontend en Render, permitirlo
+    if (origin === 'https://saas-frontend-onpj.onrender.com') {
+      return callback(null, origin);
     }
+
+    // Si quieres también permitir localhost (dev)
+    if (origin === 'http://localhost:5173') {
+      return callback(null, origin);
+    }
+
+    // Cualquier otro origen no permitido
+    return callback(new Error('CORS no permitido: ' + origin));
   },
-  credentials: true // si usas cookies o sesiones
+  credentials: true
 }));
+
 
 app.use(compression())
 app.use(express.json())
