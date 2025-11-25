@@ -9,25 +9,26 @@ import meRoutes from './routes/me.routes.js'
 import projectsRoutes from './routes/projects.routes.js'
 import tasksRoutes from './routes/tasks.routes.js'
 import filesRoutes from "./routes/files.routes.js";
-import activityRoutes from "./routes/activity.routes.js";
+import activityRoutes from "./routes/activity.routes.js"
 import compression from 'compression';
 
 dotenv.config()
 
 const app = express()
 
-// ya no necesitas esta línea:
-// const cors = require('cors');
-
 const allowedOrigins = [
   'http://localhost:5173',                    // desarrollo local
-  'https://saas-frontend-onpj.onrender.com'  // tu frontend en Render
+  'https://saas-frontend-onpj.onrender.com'  // frontend en Render
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
+    // Si no hay origin (requests desde curl o Postman), usar siempre tu frontend de Render
+    if (!origin) return callback(null, 'https://saas-frontend-onpj.onrender.com');
+
+    // Si el origin está en la lista, permitirlo
+    if (allowedOrigins.includes(origin)) {
+      callback(null, origin);
     } else {
       callback(new Error('CORS no permitido: ' + origin));
     }
