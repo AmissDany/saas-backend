@@ -20,19 +20,18 @@ const allowedOrigins = [
   "https://saas-frontend-onpj.onrender.com",
   "http://localhost:5173"
 ];
-
 app.use(cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true); // Postman, Curl, etc.
-
+  origin: function (origin, callback) {
+    // Permitir Postman, curl, etc
+    if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-
     return callback(new Error("CORS no permitido: " + origin));
   },
   credentials: true
 }));
+
 
 app.use(compression())
 app.use(express.json())
