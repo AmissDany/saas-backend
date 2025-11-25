@@ -16,21 +16,25 @@ dotenv.config()
 
 const app = express()
 
-// ✅ CORS: permite localhost y el frontend en Render
+const cors = require('cors');
+
 const allowedOrigins = [
-  'http://localhost:5173',                     // para desarrollo local
-  'https://saas-frontend-onpj.onrender.com'   // frontend desplegado en Render
-]
+  'http://localhost:5173',                    // desarrollo local
+  'https://saas-frontend-onpj.onrender.com'  // tu frontend en Render
+];
 
 app.use(cors({
   origin: function(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true)
+      callback(null, true);
     } else {
-      callback(new Error('CORS no permitido: ' + origin))
+      callback(new Error('CORS no permitido: ' + origin));
     }
-  }
-}))
+  },
+  credentials: true // si usas cookies o sesiones
+}));
+
+
 
 app.use(compression())
 app.use(express.json())
