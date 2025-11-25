@@ -17,30 +17,22 @@ dotenv.config()
 const app = express()
 
 const allowedOrigins = [
-  'https://saas-frontend-onpj.onrender.com'  // frontend en Render
+  "https://saas-frontend-onpj.onrender.com",
+  "http://localhost:5173"
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Si no hay origin (curl, Postman), usar siempre tu frontend en Render
-    if (!origin) return callback(null, 'https://saas-frontend-onpj.onrender.com');
+    if (!origin) return callback(null, true); // Postman, Curl, etc.
 
-    // Si el origin es exactamente tu frontend en Render, permitirlo
-    if (origin === 'https://saas-frontend-onpj.onrender.com') {
-      return callback(null, origin);
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
 
-    // Si quieres también permitir localhost (dev)
-    if (origin === 'http://localhost:5173') {
-      return callback(null, origin);
-    }
-
-    // Cualquier otro origen no permitido
-    return callback(new Error('CORS no permitido: ' + origin));
+    return callback(new Error("CORS no permitido: " + origin));
   },
   credentials: true
 }));
-
 
 app.use(compression())
 app.use(express.json())
