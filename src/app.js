@@ -16,7 +16,8 @@ dotenv.config()
 
 const app = express()
 
-const cors = require('cors');
+// ya no necesitas esta línea:
+// const cors = require('cors');
 
 const allowedOrigins = [
   'http://localhost:5173',                    // desarrollo local
@@ -33,8 +34,6 @@ app.use(cors({
   },
   credentials: true // si usas cookies o sesiones
 }));
-
-
 
 app.use(compression())
 app.use(express.json())
