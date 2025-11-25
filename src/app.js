@@ -16,8 +16,22 @@ dotenv.config()
 
 const app = express()
 
-// Middlewares
-app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }))
+// ✅ CORS: permite localhost y el frontend en Render
+const allowedOrigins = [
+  'http://localhost:5173',                     // para desarrollo local
+  'https://saas-frontend-onpj.onrender.com'   // frontend desplegado en Render
+]
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      callback(new Error('CORS no permitido: ' + origin))
+    }
+  }
+}))
+
 app.use(compression())
 app.use(express.json())
 
