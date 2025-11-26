@@ -1,59 +1,33 @@
-import * as tasks from "../models/tasks.js";
+import * as tasks from '../models/tasks.js';
 import cloudant, { DB } from "../config/cloudant.js";
 import { deleteDocsBySelector, deleteCOSFolder } from "../utils/cascadeDelete.js";
 import { parse } from "csv-parse/sync";
 import * as memberships from "../models/memberships.js";
 
-// 🛡 Función universal para validar project_id
-function sanitizeProjectId(raw) {
-  if (!raw) return null;
-  const cleaned = raw.replace(/^project:/, "").replace(/[^a-zA-Z0-9_-]/g, "");
-  return cleaned || null;
-}
-
 export async function listTasks(req, res) {
-  const projectId = sanitizeProjectId(req.params.id);
-  if (!projectId) return res.status(400).json({ error: "invalid_project_id" });
-
   const { estado, asignado_a } = req.query;
-  const tareas = await tasks.listByProject(projectId, { estado, asignado_a });
+  const tareas = await tasks.listByProject(req.params.id, { estado, asignado_a });
   res.json(tareas);
 }
 
 export async function createTask(req, res) {
-  const project_id = sanitizeProjectId(req.params.id);
-  if (!project_id) return res.status(400).json({ error: "invalid_project_id" });
-
   const { titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin } = req.body;
-
   const tarea = await tasks.create({
-    project_id,
-    titulo,
-    descripcion,
-    estado,
-    responsables,
-    fecha_inicio,
-    fecha_fin
+    project_id: req.params.id,
+    titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin
   });
-
   res.status(201).json(tarea);
 }
 
 export async function patchTask(req, res) {
-  try {
-    const updated = await tasks.patch(req.params.taskId, req.body || {});
-    res.json(updated);
-  } catch (err) {
-    res.status(500).json({ error: "task_patch_failed" });
-  }
+  const updated = await tasks.patch(req.params.taskId, req.body || {});
+  res.json(updated);
 }
 
 export async function deleteTask(req, res) {
   try {
-    const projectId = sanitizeProjectId(req.params.id);
-    if (!projectId) return res.status(400).json({ error: "invalid_project_id" });
+    const { id: projectId, taskId } = req.params;
 
-    const { taskId } = req.params;
     await deleteTaskCascade(taskId, projectId);
 
     res.status(204).end();
@@ -67,6 +41,7 @@ export async function deleteTaskCascade(taskId, projectId) {
   const prefix = `${projectId}/${taskId}/`;
 
   await deleteCOSFolder(prefix);
+
   await deleteDocsBySelector(DB.files, { task_id: taskId });
   await deleteDocsBySelector(DB.activity, { task_id: taskId });
 
@@ -84,26 +59,24 @@ export async function deleteTaskCascade(taskId, projectId) {
 
 export async function importCsvTasks(req, res) {
   try {
-    const project_id = sanitizeProjectId(req.params.id);
-    if (!project_id) return res.status(400).json({ error: "invalid_project_id" });
-
     if (!req.file) {
       return res.status(400).json({ error: "missing_csv_file" });
     }
 
     const csvText = req.file.buffer.toString("utf8");
-    let records;
 
+    let records;
     try {
       records = parse(csvText, {
         columns: true,
         skip_empty_lines: true,
-        trim: true
+        trim: true,
       });
     } catch (e) {
       return res.status(400).json({ error: "invalid_csv_format" });
     }
 
+    const project_id = req.params.id;
     const members = await memberships.listByProject(project_id);
 
     const emailToUserId = {};
@@ -118,8 +91,8 @@ export async function importCsvTasks(req, res) {
 
     for (let i = 0; i < records.length; i++) {
       const r = records[i];
-
       const titulo = r.titulo?.trim();
+
       if (!titulo) {
         errors.push(`Fila ${i + 1}: falta título`);
         continue;
@@ -145,7 +118,7 @@ export async function importCsvTasks(req, res) {
           estado: r.estado || "pendiente",
           responsables,
           fecha_inicio: r.fecha_inicio || null,
-          fecha_fin: r.fecha_fin || null
+          fecha_fin: r.fecha_fin || null,
         });
 
         created++;
@@ -162,13 +135,23 @@ export async function importCsvTasks(req, res) {
         action: "CSV_IMPORTED",
         description: `Se importaron ${created} tareas desde archivo CSV`,
         created_at: new Date().toISOString(),
-        metadata: { created, errors, total: records.length }
-      }
+        metadata: {
+          created,
+          errors,
+          total: records.length,
+        },
+      },
     });
 
-    return res.json({ created, errors, total: records.length });
+    return res.json({
+      created,
+      errors,
+      total: records.length,
+    });
+
   } catch (e) {
     console.error(e);
     return res.status(500).json({ error: "import_failed" });
   }
 }
+
