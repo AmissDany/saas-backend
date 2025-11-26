@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../config/auth.js';
+
 import {
   checkProjectAccess,
   requireOwner,
@@ -16,12 +17,15 @@ import {
 } from '../controllers/projects.controller.js';
 
 import * as membersCtl from '../controllers/members.controller.js';
-import { registerAction } from "../middleware/activityLogger.js";
+
+// 🟢 Importación correcta de tareas
+import * as tasksCtl from "../controllers/tasks.controller.js";
 import { importCsvTasks } from "../controllers/tasks.controller.js";
+
+import { registerAction } from "../middleware/activityLogger.js";
 
 import multer from "multer";
 const upload = multer(); // <-- ahora multer procesa CSV
-
 
 const r = Router();
 
@@ -31,7 +35,17 @@ const r = Router();
 r.get('/', requireAuth, listMyProjects);
 r.post('/', requireAuth, createProject);
 
+// GET /proyectos/:id
 r.get('/:id', requireAuth, checkProjectAccess, getProject);
+
+// 🟢 NUEVA RUTA NECESARIA
+// GET /proyectos/:id/tareas
+r.get(
+  '/:id/tareas',
+  requireAuth,
+  checkProjectAccess,
+  tasksCtl.listTasks
+);
 
 r.patch(
   '/:id',
@@ -51,6 +65,7 @@ r.delete(
   deleteProject
 );
 
+// Importar CSV de tareas
 r.post(
   '/:id/tareas/import-csv',
   requireAuth,
@@ -60,6 +75,7 @@ r.post(
   importCsvTasks
 );
 
+// Miembros
 r.get('/:id/members', requireAuth, checkProjectAccess, membersCtl.listMembers);
 
 r.post(
