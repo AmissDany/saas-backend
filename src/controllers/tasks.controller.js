@@ -4,17 +4,22 @@ import { deleteDocsBySelector, deleteCOSFolder } from "../utils/cascadeDelete.js
 import { parse } from "csv-parse/sync";
 import * as memberships from "../models/memberships.js";
 
+// Helper para limpiar el ID si llega sucio (ej: "project:project:...")
+const cleanId = (id) => id.replace(/^project:/, "");
+
 export async function listTasks(req, res) {
   const { estado, asignado_a } = req.query;
-  const tareas = await tasks.listByProject(req.params.id, { estado, asignado_a });
+  // Limpiamos el ID antes de buscar
+  const projectId = cleanId(req.params.id);
+  
+  const tareas = await tasks.listByProject(projectId, { estado, asignado_a });
   res.json(tareas);
 }
 
 export async function createTask(req, res) {
   try {
     // Sanitize del ID: si viene con "project:" lo eliminamos
-    let projectId = req.params.id;
-    projectId = projectId.replace(/^project:/, "");
+    const projectId = cleanId(req.params.id);
 
     const { titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin } = req.body;
 
@@ -43,7 +48,8 @@ export async function patchTask(req, res) {
 
 export async function deleteTask(req, res) {
   try {
-    const { id: projectId, taskId } = req.params;
+    const { id, taskId } = req.params;
+    const projectId = cleanId(id); // Limpiamos ID del proyecto
 
     await deleteTaskCascade(taskId, projectId);
 
@@ -55,6 +61,7 @@ export async function deleteTask(req, res) {
 }
 
 export async function deleteTaskCascade(taskId, projectId) {
+  // Aseguramos que el prefijo para COS/archivos sea consistente
   const prefix = `${projectId}/${taskId}/`;
 
   await deleteCOSFolder(prefix);
@@ -93,7 +100,9 @@ export async function importCsvTasks(req, res) {
       return res.status(400).json({ error: "invalid_csv_format" });
     }
 
-    const project_id = req.params.id;
+    // Limpiamos el ID aquí también
+    const project_id = cleanId(req.params.id);
+    
     const members = await memberships.listByProject(project_id);
 
     const emailToUserId = {};
@@ -171,4 +180,3 @@ export async function importCsvTasks(req, res) {
     return res.status(500).json({ error: "import_failed" });
   }
 }
-
