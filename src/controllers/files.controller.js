@@ -1,5 +1,6 @@
 import { cos, BUCKET } from "../config/cos.js";
 import * as files from "../models/files.js";
+import cloudant, { DB } from "../config/cloudant.js";
 
 export async function uploadFile(req, res) {
   console.log("\n📌 POST /files llamado");
@@ -52,17 +53,33 @@ export async function listFiles(req, res) {
 }
 
 export async function removeFile(req, res) {
-  const fileId = req.params.fileId;
-  const doc = await files.getFile(fileId);
+  try {
+    console.log("🗑 DELETE FILE →", req.params);
 
-  const key = doc.key;
+    const fileId = req.params.fileId;
+    const doc = await files.getFile(fileId);
 
-  await cos.deleteObject({
-    Bucket: BUCKET,
-    Key: key
-  });
+    if (!doc) return res.status(404).json({ error: "file_not_found" });
 
-  await files.deleteFile(fileId);
+    /** 1) Borrar archivo en COS */
+    console.log("🗑 Eliminando en COS →", doc.key);
+    await cos.deleteObject({
+      Bucket: BUCKET,
+      Key: doc.key
+    });
 
-  res.status(204).end();
+    /** 2) Borrar documento en Cloudant */
+    console.log("🗑 Eliminando registro Cloudant →", doc._id);
+    await cloudant.deleteDocument({
+      db: DB.files,
+      docId: doc._id,
+      rev: doc._rev
+    });
+
+    return res.status(204).end();
+
+  } catch (err) {
+    console.error("❌ Error delete file:", err);
+    res.status(500).json({ error: "delete_failed", detail: err.message });
+  }
 }
