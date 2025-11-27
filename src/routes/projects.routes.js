@@ -1,11 +1,10 @@
 import { Router } from 'express';
 import { requireAuth } from '../config/auth.js';
-
 import {
   checkProjectAccess,
   requireOwner,
   requireWriter,
-  requireEditorOrOwner
+  registerAction // Importamos registerAction para el registro de actividad
 } from '../middleware/authz.js';
 
 import {
@@ -17,88 +16,91 @@ import {
 } from '../controllers/projects.controller.js';
 
 import * as membersCtl from '../controllers/members.controller.js';
-
-// 🟢 Importación correcta de tareas
-import * as tasksCtl from "../controllers/tasks.controller.js";
-import { importCsvTasks } from "../controllers/tasks.controller.js";
-
-import { registerAction } from "../middleware/activityLogger.js";
+import * as tasksCtl from "../controllers/tasks.controller.js"; // Importamos todo el controlador de tareas
 
 import multer from "multer";
-const upload = multer(); // <-- ahora multer procesa CSV
+const upload = multer(); // Configuración para subir archivos (CSV)
 
 const r = Router();
 
 // ------------------------------
-//   PROYECTOS
+//   RUTAS DE PROYECTOS
 // ------------------------------
 r.get('/', requireAuth, listMyProjects);
 r.post('/', requireAuth, createProject);
 
-// GET /proyectos/:id
+// Obtener un proyecto específico
 r.get('/:id', requireAuth, checkProjectAccess, getProject);
 
-// 🟢 NUEVA RUTA NECESARIA
-// GET /proyectos/:id/tareas
-r.get(
-  '/:id/tareas',
-  requireAuth,
-  checkProjectAccess,
-  tasksCtl.listTasks
-);
-
-r.patch(
-  '/:id',
-  requireAuth,
-  checkProjectAccess,
-  registerAction("PROJECT_UPDATED"),
-  requireWriter,
+// Actualizar proyecto
+r.patch('/:id', 
+  requireAuth, checkProjectAccess, requireWriter, 
+  registerAction("PROJECT_UPDATED"), 
   patchProject
 );
 
-r.delete(
-  "/:id",
-  requireAuth,
-  checkProjectAccess,
-  requireOwner,
-  registerAction("PROJECT_DELETED"),
+// Eliminar proyecto
+r.delete('/:id', 
+  requireAuth, checkProjectAccess, requireOwner, 
+  registerAction("PROJECT_DELETED"), 
   deleteProject
 );
 
-// Importar CSV de tareas
-r.post(
-  '/:id/tareas/import-csv',
-  requireAuth,
-  checkProjectAccess,
-  requireEditorOrOwner,
-  upload.single("csv"),
-  importCsvTasks
+// ------------------------------
+//   RUTAS DE TAREAS (ANIDADAS)
+// ------------------------------
+
+// 1. Listar Tareas del Proyecto
+r.get('/:id/tareas', 
+  requireAuth, checkProjectAccess, 
+  tasksCtl.listTasks
 );
 
-// Miembros
+// 2. Crear Tarea (ESTA FALTABA y causaba el error 404)
+r.post('/:id/tareas', 
+  requireAuth, checkProjectAccess, requireWriter,
+  registerAction("TASK_CREATED"),
+  tasksCtl.createTask
+);
+
+// 3. Editar Tarea
+r.patch('/:id/tareas/:taskId',
+  requireAuth, checkProjectAccess, requireWriter,
+  registerAction("TASK_UPDATED"),
+  tasksCtl.patchTask
+);
+
+// 4. Eliminar Tarea
+r.delete('/:id/tareas/:taskId',
+  requireAuth, checkProjectAccess, requireWriter,
+  registerAction("TASK_DELETED"),
+  tasksCtl.deleteTask
+);
+
+// 5. Importar Tareas desde CSV
+r.post('/:id/tareas/import-csv',
+  requireAuth, checkProjectAccess, requireWriter, // requireWriter es suficiente, o requireEditorOrOwner
+  upload.single("csv"),
+  tasksCtl.importCsvTasks
+);
+
+// ------------------------------
+//   RUTAS DE MIEMBROS
+// ------------------------------
 r.get('/:id/members', requireAuth, checkProjectAccess, membersCtl.listMembers);
 
-r.post(
-  '/:id/members',
-  requireAuth,
-  checkProjectAccess,
-  requireOwner,
+r.post('/:id/members', 
+  requireAuth, checkProjectAccess, requireOwner, 
   membersCtl.addMemberByEmail
 );
 
-r.delete(
-  '/:id/members/:userId',
-  requireAuth,
-  checkProjectAccess,
-  requireOwner,
+r.delete('/:id/members/:userId', 
+  requireAuth, checkProjectAccess, requireOwner, 
   membersCtl.removeMember
 );
 
-r.patch(
-  '/:id/members/:userId/role',
-  requireAuth,
-  checkProjectAccess,
-  requireOwner,
+r.patch('/:id/members/:userId/role', 
+  requireAuth, checkProjectAccess, requireOwner, 
   membersCtl.updateRole
 );
 

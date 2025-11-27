@@ -4,17 +4,31 @@ import { deleteDocsBySelector, deleteCOSFolder } from "../utils/cascadeDelete.js
 import { parse } from "csv-parse/sync";
 import * as memberships from "../models/memberships.js";
 
+// --- Función auxiliar para limpiar el ID ---
+// Quita el prefijo "project:" si existe, para evitar errores en la BD
+function cleanProjectId(id) {
+  if (!id) return id;
+  return id.replace(/^project:/, "");
+}
+
 export async function listTasks(req, res) {
-  const { estado, asignado_a } = req.query;
-  const tareas = await tasks.listByProject(req.params.id, { estado, asignado_a });
-  res.json(tareas);
+  try {
+    const { estado, asignado_a } = req.query;
+    // LIMPIEZA DE ID: Fundamental para que funcione con tu frontend actual
+    const projectId = cleanProjectId(req.params.id);
+
+    const tareas = await tasks.listByProject(projectId, { estado, asignado_a });
+    res.json(tareas);
+  } catch (error) {
+    console.error("Error listing tasks:", error);
+    res.status(500).json({ error: "error_listing_tasks" });
+  }
 }
 
 export async function createTask(req, res) {
   try {
-    // Sanitize del ID: si viene con "project:" lo eliminamos
-    let projectId = req.params.id;
-    projectId = projectId.replace(/^project:/, "");
+    // LIMPIEZA DE ID
+    const projectId = cleanProjectId(req.params.id);
 
     const { titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin } = req.body;
 
@@ -37,31 +51,45 @@ export async function createTask(req, res) {
 }
 
 export async function patchTask(req, res) {
-  const updated = await tasks.patch(req.params.taskId, req.body || {});
-  res.json(updated);
+  try {
+    // No necesitamos el ID del proyecto para el patch, solo el taskId
+    const updated = await tasks.patch(req.params.taskId, req.body || {});
+    res.json(updated);
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res.status(500).json({ error: "error_updating_task" });
+  }
 }
 
 export async function deleteTask(req, res) {
   try {
-    const { id: projectId, taskId } = req.params;
+    // LIMPIEZA DE ID
+    const projectId = cleanProjectId(req.params.id);
+    const { taskId } = req.params;
 
     await deleteTaskCascade(taskId, projectId);
 
     res.status(204).end();
   } catch (err) {
-    console.error(err);
+    console.error("Error deleting task:", err);
     res.status(500).json({ error: "error_deleting_task" });
   }
 }
 
+// Función auxiliar para borrado en cascada (Archivos, Actividad, Doc)
 export async function deleteTaskCascade(taskId, projectId) {
-  const prefix = `${projectId}/${taskId}/`;
+  // Asegurarse de usar ID limpio si se usa para rutas de archivos
+  const cleanProjId = cleanProjectId(projectId);
+  const prefix = `${cleanProjId}/${taskId}/`;
 
+  // 1. Borrar carpeta en Cloud Object Storage
   await deleteCOSFolder(prefix);
 
+  // 2. Borrar registros de archivos y actividad en BD
   await deleteDocsBySelector(DB.files, { task_id: taskId });
   await deleteDocsBySelector(DB.activity, { task_id: taskId });
 
+  // 3. Borrar la tarea en sí
   const taskDoc = await cloudant.getDocument({
     db: DB.tasks,
     docId: taskId
@@ -93,7 +121,10 @@ export async function importCsvTasks(req, res) {
       return res.status(400).json({ error: "invalid_csv_format" });
     }
 
-    const project_id = req.params.id;
+    // LIMPIEZA DE ID
+    const project_id = cleanProjectId(req.params.id);
+    
+    // Obtenemos miembros para asignar responsables por email
     const members = await memberships.listByProject(project_id);
 
     const emailToUserId = {};
@@ -144,6 +175,7 @@ export async function importCsvTasks(req, res) {
       }
     }
 
+    // Registrar actividad
     await cloudant.postDocument({
       db: DB.activity,
       document: {
@@ -171,4 +203,3 @@ export async function importCsvTasks(req, res) {
     return res.status(500).json({ error: "import_failed" });
   }
 }
-
