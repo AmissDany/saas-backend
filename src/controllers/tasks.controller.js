@@ -11,12 +11,29 @@ export async function listTasks(req, res) {
 }
 
 export async function createTask(req, res) {
-  const { titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin } = req.body;
-  const tarea = await tasks.create({
-    project_id: req.params.id,
-    titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin
-  });
-  res.status(201).json(tarea);
+  try {
+    // Sanitize del ID: si viene con "project:" lo eliminamos
+    let projectId = req.params.id;
+    projectId = projectId.replace(/^project:/, "");
+
+    const { titulo, descripcion, estado, responsables, fecha_inicio, fecha_fin } = req.body;
+
+    const tarea = await tasks.create({
+      project_id: projectId,
+      titulo,
+      descripcion,
+      estado,
+      responsables,
+      fecha_inicio,
+      fecha_fin
+    });
+
+    return res.status(201).json(tarea);
+
+  } catch (error) {
+    console.error("Error creating task:", error);
+    return res.status(500).json({ error: "error_creating_task" });
+  }
 }
 
 export async function patchTask(req, res) {
