@@ -1,14 +1,28 @@
 import { cos, BUCKET } from "../config/cos.js";
 import * as files from "../models/files.js";
 
+// 🟢 Limpia "project:" y extrae UUID real de taskId
+function cleanProjectId(id) {
+  return id.replace(/^project:/, "");
+}
+
+function extractTaskUUID(id) {
+  const parts = id.split(":");        // task : projectUUID : uuid
+  return parts.length >= 3 ? parts[2] : parts[0]; // ← devuelve SOLO el UUID
+}
+
+/* ========== subir archivo ========== */
 export async function uploadFile(req, res) {
   try {
-    const { id: project_id, taskId: task_id } = req.params;
+    let { id: project_id, taskId } = req.params;
+
+    const cleanProject = cleanProjectId(project_id);
+    const cleanTaskId = extractTaskUUID(taskId);
     const file = req.file;
 
     if (!file) return res.status(400).json({ error: "missing_file" });
 
-    const key = `${project_id}/${task_id}/${file.originalname}`;
+    const key = `${cleanProject}/${cleanTaskId}/${file.originalname}`;
 
     await cos.putObject({
       Bucket: BUCKET,
@@ -20,8 +34,8 @@ export async function uploadFile(req, res) {
     const url = `${process.env.COS_ENDPOINT}/${BUCKET}/${key}`;
 
     const saved = await files.addFile({
-      project_id,
-      task_id,
+      project_id: cleanProject,
+      task_id: cleanTaskId,
       filename: file.originalname,
       mime: file.mimetype,
       size: file.size,
@@ -36,22 +50,22 @@ export async function uploadFile(req, res) {
   }
 }
 
+/* ========== listar archivos ========== */
 export async function listFiles(req, res) {
-  const docs = await files.listFiles(req.params.taskId);
+  const cleanTaskId = extractTaskUUID(req.params.taskId);
+  const docs = await files.listFiles(cleanTaskId);
   res.json(docs);
 }
 
+/* ========== borrar archivo ========== */
 export async function removeFile(req, res) {
+  const cleanTaskId = extractTaskUUID(req.params.taskId);
   const fileId = req.params.fileId;
+
   const doc = await files.getFile(fileId);
+  if (!doc) return res.status(404).json({ error: "file_not_found" });
 
-  const key = doc.key;
-
-  await cos.deleteObject({
-    Bucket: BUCKET,
-    Key: key
-  });
-
+  await cos.deleteObject({ Bucket: BUCKET, Key: doc.key });
   await files.deleteFile(fileId);
 
   res.status(204).end();
