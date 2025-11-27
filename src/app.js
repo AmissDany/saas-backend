@@ -51,6 +51,6 @@ app.use('/api/auth', authRoutes)
 app.use('/api/me', meRoutes)
 app.use('/api/proyectos', projectsRoutes)
 app.use('/api/tasks', tasksRoutes)
-app.use("/api/files", filesRoutes)
+app.use("/api", filesRoutes)
 
 export default app
