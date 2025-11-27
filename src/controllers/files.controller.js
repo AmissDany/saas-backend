@@ -2,6 +2,11 @@ import { cos, BUCKET } from "../config/cos.js";
 import * as files from "../models/files.js";
 
 export async function uploadFile(req, res) {
+  console.log("\n📌 POST /files llamado");
+  console.log("📥 Params:", req.params);
+  console.log("📄 req.file:", req.file);
+  console.log("📦 Body keys:", Object.keys(req.body));
+  console.log("🔐 Headers:", req.headers["content-type"]);
   try {
     const { id: project_id, taskId: task_id } = req.params;
     const file = req.file;
