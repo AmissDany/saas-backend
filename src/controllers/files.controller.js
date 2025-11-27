@@ -38,6 +38,11 @@ export async function uploadFile(req, res) {
 
 export async function listFiles(req, res) {
   const docs = await files.listFiles(req.params.taskId);
+  console.log("📌 [FILES] GET /files llamada");
+  console.log("🔍 params.id (proyecto)  =>", req.params.id);
+  console.log("🔍 params.taskId          =>", req.params.taskId);
+  console.log("🧩 URL completa recibida  =>", req.originalUrl);
+
   res.json(docs);
 }
 
