@@ -1,11 +1,15 @@
 import { Router } from 'express';
 import { requireAuth } from '../config/auth.js';
+
+// 1. Corregimos los imports de authz (quitamos registerAction de aquí)
 import {
   checkProjectAccess,
   requireOwner,
-  requireWriter,
-  registerAction // Importamos registerAction para el registro de actividad
+  requireWriter
 } from '../middleware/authz.js';
+
+// 2. Importamos registerAction del lugar correcto
+import { registerAction } from '../middleware/activityLogger.js';
 
 import {
   listMyProjects,
@@ -16,10 +20,10 @@ import {
 } from '../controllers/projects.controller.js';
 
 import * as membersCtl from '../controllers/members.controller.js';
-import * as tasksCtl from "../controllers/tasks.controller.js"; // Importamos todo el controlador de tareas
+import * as tasksCtl from "../controllers/tasks.controller.js";
 
 import multer from "multer";
-const upload = multer(); // Configuración para subir archivos (CSV)
+const upload = multer();
 
 const r = Router();
 
@@ -56,7 +60,7 @@ r.get('/:id/tareas',
   tasksCtl.listTasks
 );
 
-// 2. Crear Tarea (ESTA FALTABA y causaba el error 404)
+// 2. Crear Tarea
 r.post('/:id/tareas', 
   requireAuth, checkProjectAccess, requireWriter,
   registerAction("TASK_CREATED"),
@@ -79,7 +83,7 @@ r.delete('/:id/tareas/:taskId',
 
 // 5. Importar Tareas desde CSV
 r.post('/:id/tareas/import-csv',
-  requireAuth, checkProjectAccess, requireWriter, // requireWriter es suficiente, o requireEditorOrOwner
+  requireAuth, checkProjectAccess, requireWriter, 
   upload.single("csv"),
   tasksCtl.importCsvTasks
 );
