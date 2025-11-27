@@ -1,24 +1,9 @@
 import { cos, BUCKET } from "../config/cos.js";
 import * as files from "../models/files.js";
 
-function extractProjectId(id) {
-  // project:UUID → UUID
-  return id.includes(":") ? id.split(":")[1] : id;
-}
-
-function extractTaskId(taskId) {
-  // task:PROJUUID:TASKUUID → TASKUUID
-  const parts = taskId.split(":");
-  return parts.length >= 3 ? parts[2] : taskId;
-}
-
 export async function uploadFile(req, res) {
   try {
-    const rawProjectId = req.params.id;
-    const rawTaskId   = req.params.taskId;
-
-    const project_id = extractProjectId(rawProjectId);
-    const task_id    = extractTaskId(rawTaskId);
+    const { id: project_id, taskId: task_id } = req.params;
     const file = req.file;
 
     if (!file) return res.status(400).json({ error: "missing_file" });
@@ -52,8 +37,7 @@ export async function uploadFile(req, res) {
 }
 
 export async function listFiles(req, res) {
-  const task_id = extractTaskId(req.params.taskId);
-  const docs = await files.listFiles(task_id);
+  const docs = await files.listFiles(req.params.taskId);
   res.json(docs);
 }
 
