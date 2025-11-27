@@ -1,13 +1,8 @@
 import * as memberships from '../models/memberships.js';
 
-function extractProjectId(id) {
-  return id?.includes(":") ? id.split(":")[1] : id;
-}
-
 export async function checkProjectAccess(req, res, next) {
     try {
-        const rawId = req.params.id || req.body.project_id;
-        const projectId = extractProjectId(rawId);
+        const projectId = req.params.id || req.body.project_id;
         if (!req.userId || !projectId) return res.status(400).json({ error: 'missing user/project' });
         const member = await memberships.findOne({ user_id: req.userId, project_id: projectId, status: 'active' });
         if (!member) return res.status(403).json({ error: 'forbidden' });
